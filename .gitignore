@@ -1,0 +1,5 @@
+karma*
+node_modules
+npm-debug.log
+.grunt
+_SpecRunner.html
