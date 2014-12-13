@@ -119,11 +119,28 @@ function init() {
         forwards = {};
     }
 
+    function mkDef(api) {
+        return function (definition) {
+            return definition(api);
+        }
+    }
+
     return {
-        publish: publish,
-        subscribe: subscribe,
-        unsubscribe: unsubscribe,
-        filter: filter,
+        define: {
+            publisher: mkDef({
+                publish: publish,
+                promises: q
+            }),
+            subscriber: mkDef({
+                subscribe: subscribe,
+                unsubscribe: unsubscribe,
+                promises: q
+            }),
+            filter: mkDef({
+                filter: filter,
+                promises: q
+            })
+        },
         forwardTo: forwardTo,
         dropForward: dropForward,
         name: name,
