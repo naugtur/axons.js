@@ -1,6 +1,6 @@
 {
   "name": "axons",
-  "version": "0.1.0",
+  "version": "0.1.1-0",
   "description": "A communication channel you always wanted instead of pub-sub",
   "main": "index.js",
   "engines": {
