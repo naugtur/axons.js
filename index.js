@@ -58,7 +58,7 @@ function init() {
         return q(true).then(function () {
             var data = (input) ? clone(input) : {};
             var promiseArgs = q(data);
-            selectedFilters.forEach(function (args, filter) {
+            selectedFilters.forEach(function (filter) {
                 promiseArgs = promiseArgs.then(filter);
             });
             return promiseArgs;
