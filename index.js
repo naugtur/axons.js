@@ -14,9 +14,13 @@ function clone(obj) {
     }
 }
 
+function identity(i) {
+    return i;
+}
+
 function getByTopic(collection, topic) {
     var parentTopic = topic.replace(/\.[^.]+$/, '');
-    return [].concat(collection[topic], (topic !== parentTopic ? getByTopic(collection, parentTopic) : []));
+    return [].concat(collection[topic], (topic !== parentTopic ? getByTopic(collection, parentTopic) : [])).filter(identity);
 }
 
 
