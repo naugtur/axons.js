@@ -29,7 +29,8 @@ function init() {
 
     var name = channelSeed++,
         subscriptions = {},
-        filters = {},
+        transforms = {},
+        moderators = {},
         forwards = {};
 
     //subscribes a function to a topic
@@ -52,17 +53,28 @@ function init() {
     //publishes in topic
     function publish(topic, input) {
 
-        var selectedFilters = getByTopic(filters, topic);
-        var selectedSubs = getByTopic(subscriptions, topic);
 
         return q(true).then(function () {
+            var selectedTransforms = getByTopic(transforms, topic);
             var data = (input) ? clone(input) : {};
             var promiseArgs = q(data);
-            selectedFilters.forEach(function (filter) {
-                promiseArgs = promiseArgs.then(filter);
+            selectedTransforms.forEach(function (transform) {
+                promiseArgs = promiseArgs.then(transform);
             });
             return promiseArgs;
         }).then(function (data) {
+            if (moderator[topic]) {
+                return q().then(function () {
+                    return moderator[topic](topic, data);
+                }).then(function (newTopic) {
+                    topic = newTopic;
+                    return data;
+                })
+            } else {
+                return data;
+            }
+        }).then(function (data) {
+            var selectedSubs = getByTopic(subscriptions, topic);
             var todos = [];
             //call subscribers
             todos = todos.concat(selectedSubs.map(function (subber) {
@@ -78,13 +90,21 @@ function init() {
 
     }
 
-    //register a filter function that gets called the same way as a subscribtion handler, but has to resolve to arguments that are supposed to be passed on
-    //if filter function throws, the publish is instantly cancelled
-    function filter(what, filter) {
-        if (!filters[what]) {
-            filters[what] = [];
+    //register a transform function that gets called the same way as a subscribtion handler, but has to resolve to arguments that are supposed to be passed on
+    //if transform function throws, the publish is instantly cancelled
+    function transform(what, transform) {
+        if (!transforms[what]) {
+            transforms[what] = [];
         }
-        filters[what].push(filter);
+        transforms[what].push(transform);
+    }
+
+    function moderator(what, moderator) {
+        if (!moderators[what]) {
+            moderators[what] = moderator;
+        } else {
+            throw new Error("There can be only one moderator for topic. " + what);
+        }
     }
 
     function forwardTo(chan) {
@@ -102,12 +122,14 @@ function init() {
 
     function destroy() {
         subscriptions = {};
-        filters = {};
+        transforms = {};
+        moderators = {};
         forwards = {};
     }
 
     function mkDef(api) {
         return function (definition) {
+            api.promises = q;
             return definition(api);
         }
     }
@@ -115,17 +137,17 @@ function init() {
     return {
         define: {
             publisher: mkDef({
-                publish: publish,
-                promises: q
+                publish: publish
             }),
             subscriber: mkDef({
                 subscribe: subscribe,
-                unsubscribeAll: unsubscribeAll,
-                promises: q
+                unsubscribeAll: unsubscribeAll
             }),
-            filter: mkDef({
-                filter: filter,
-                promises: q
+            transform: mkDef({
+                transform: transform
+            }),
+            moderator: mkDef({
+                moderator: moderator
             })
         },
         forwardTo: forwardTo,
