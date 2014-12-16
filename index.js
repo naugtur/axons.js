@@ -54,7 +54,7 @@ function init() {
     function publish(topic, input) {
 
 
-        return q(true).then(function () {
+        return q().then(function () {
             var selectedTransforms = getByTopic(transforms, topic);
             var data = (input) ? clone(input) : {};
             var promiseArgs = q(data);
@@ -66,8 +66,8 @@ function init() {
             if (moderator[topic]) {
                 return q().then(function () {
                     return moderator[topic](topic, data);
-                }).then(function (newTopic) {
-                    topic = newTopic;
+                }).then(function (topicDetail) {
+                    topic = topic + '.' + topicDetail;
                     return data;
                 })
             } else {
