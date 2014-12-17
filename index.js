@@ -27,7 +27,7 @@ function topicRecur(collection, topic) {
 }
 
 function getByTopic(collection, topic) {
-    topicRecur(collection, topic).filter(identity).sort(function (a, b) {
+    return topicRecur(collection, topic).filter(identity).sort(function (a, b) {
         return ~~(a.order) - ~~(b.order) //ascending
     }).map(function (e) {
         return e.func
