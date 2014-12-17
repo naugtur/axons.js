@@ -65,7 +65,7 @@ function init() {
         }).then(function (data) {
             if (moderator[topic]) {
                 return q().then(function () {
-                    return moderator[topic](topic, data);
+                    return moderator[topic](data, topic);
                 }).then(function (topicDetail) {
                     topic = topic + '.' + topicDetail;
                     return data;
