@@ -21,7 +21,7 @@ function identity(i) {
 function topicRecur(collection, topic) {
     var parentTopic = topic.replace(/\.[^.]+$/, '');
     return [].concat(
-        (topic !== parentTopic ? getByTopic(collection, parentTopic) : []),
+        (topic !== parentTopic ? topicRecur(collection, parentTopic) : []),
         collection[topic]
     );
 }
