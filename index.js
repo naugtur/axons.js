@@ -2,6 +2,7 @@ var q = require('q');
 var channelSeed = 0;
 
 //shallow clone
+//TODO: consider replacing with better one
 function clone(obj) {
     if (typeof obj === "object") {
         var target = {};
@@ -13,6 +14,14 @@ function clone(obj) {
         return target;
     }
 }
+
+function mkDef(api) {
+    return function (definition) {
+        api.promises = q;
+        return definition(api);
+    }
+}
+
 
 function identity(i) {
     return i;
@@ -27,14 +36,52 @@ function topicRecur(collection, topic) {
 }
 
 function getByTopic(collection, topic) {
-    return topicRecur(collection, topic).filter(identity).sort(function (a, b) {
-        return ~~(a.order) - ~~(b.order) //ascending
-    }).map(function (e) {
-        return e.func
-    });
+    return topicRecur(collection, topic).filter(identity)
 }
 
+function rmItemFromArray(item, array) {
+    return array.splice(array.indexOf(item), 1);
+}
 
+//Factory of functions that can be used for defining subscribers, transforms etc.
+// that are in a 1 topic to many flowElements relation
+function flowElementRegistererFactory(elementsCollection) { //#sojava
+    return function defineFlowElement(topic, func, order) {
+        if (!elementsCollection[topic]) {
+            elementsCollection[topic] = [];
+        }
+        elementsCollection[topic].push({
+            func: func,
+            ord: order, //only used for transforms, but code-reuse is good, so subscribers have it too
+            t: topic
+        });
+        return {
+            drop: function () {
+                elementsCollection[topic] = rmItemFromArray(elementsCollection, elementsCollection[topic])
+            }
+        }
+    }
+}
+
+//Factory of functions that can be used for defining moderators etc.
+// that are in 1 to 1 relation with a topic
+function controlHandlerRegistererFactory(handlersCollection, name) {
+    return function defineControlHandler(topic, controlHandler) {
+        if (!handlersCollection[topic]) {
+            handlersCollection[topic] = controlHandler;
+            return {
+                drop: function () {
+                    if (handlersCollection[topic] === controlHandler) {
+                        handlersCollection[topic] = null;
+                    }
+                }
+            }
+        } else {
+            throw new Error("There can be only one " + name + " for topic. " + topic);
+        }
+    }
+
+}
 
 function init() {
 
@@ -42,36 +89,25 @@ function init() {
         subscriptions = {},
         transforms = {},
         moderators = {},
-        forwards = {};
+        forwards = {},
+        reporter;
 
-    //subscribes a function to a topic
-    function subscribe(topic, func, order) {
-        if (!subscriptions[topic]) {
-            subscriptions[topic] = [];
-        }
-        subscriptions[topic].push({
-            func: func,
-            order: order
-        });
-    }
-
-    //clears the topic
-    function unsubscribeAll(topic) {
-        if (subscriptions[topic]) {
-            subscriptions[topic] = [];
-        }
-    }
 
     //publishes in topic
     function publish(topic, input) {
-
+        var report = ['pub:' + topic];
 
         return q().then(function () {
-            var selectedTransforms = getByTopic(transforms, topic);
+            var selectedTransforms = getByTopic(transforms, topic).sort(function (a, b) {
+                return (~~(a.ord) - ~~(b.ord)) //ascending
+            });
             var data = (input) ? clone(input) : {};
             var promiseArgs = q(data);
             selectedTransforms.forEach(function (transform) {
-                promiseArgs = promiseArgs.then(transform);
+                promiseArgs = promiseArgs.then(function (data) {
+                    reporter && report.push('tr:' + transform.t);
+                    return transform.func(data);
+                });
             });
             return promiseArgs;
         }).then(function (data) {
@@ -79,6 +115,7 @@ function init() {
                 return q().then(function () {
                     return moderators[topic](data, topic);
                 }).then(function (topicDetail) {
+                    reporter && report.push('mod:' + topic + '+.' + topicDetail);
                     topic = topic + '.' + topicDetail;
                     return data;
                 })
@@ -87,38 +124,55 @@ function init() {
             }
         }).then(function (data) {
             var selectedSubs = getByTopic(subscriptions, topic);
-            var todos = selectedSubs.map(function (subber) {
-                return subber(data);
-            });
-            for (var ch in forwards) {
-                //TODO, this is kinda inconsequent, resolutions from there are going to be returned as arrays
-                //but at least error handling is ok.
-                todos.push(forwards[ch].publish(topic, input));
+            var currentRepot, todos;
+            if (reporter) {
+                currentRepot = report.length;
+                report[currentRepot] = 'subs: ';
+                todos = selectedSubs.map(function (subber) {
+                    return q(data).then(subber.func).then(function (a) {
+                        report[currentRepot] += (subber.t + ';');
+                        return a;
+                    }, function (err) {
+                        report[currentRepot] += (subber.t + '(!);');
+                        throw err;
+                    });
+                });
+            } else {
+                todos = selectedSubs.map(function (subber) {
+                    return q(data).then(subber.func);
+                });
             }
+            if (forwards.length > 0) {
+                reporter && report.push('fwd:' + forwards.length);
+                for (var ch in forwards) {
+                    //TODO, this is kinda inconsequent, resolutions from there are going to be returned as arrays
+                    //but at least error handling is ok.
+                    todos.push(forwards[ch].publish(topic, input));
+                }
+            }
+
+
             return q.all(todos);
+
+        }).then(function (resolutions) {
+            reporter && reporter({
+                report: '[ok] ' + report.join(" >> ")
+            });
+            return resolutions;
+        }, function (err) {
+            reporter && reporter({
+                report: '[!!] ' + report.join(" >> ") + " (!)" + err,
+                input: input,
+                error: err
+            });
+            throw err;
         });
 
     }
 
-    //register a transform function that gets called the same way as a subscribtion handler, but has to resolve to arguments that are supposed to be passed on
-    //if transform function throws, the publish is instantly cancelled
-    function transform(what, transform, order) {
-        if (!transforms[what]) {
-            transforms[what] = [];
-        }
-        transforms[what].push({
-            func: transform,
-            order: order
-        });
-    }
 
-    function moderator(what, moderator) {
-        if (!moderators[what]) {
-            moderators[what] = moderator;
-        } else {
-            throw new Error("There can be only one moderator for topic. " + what);
-        }
-    }
+
+
 
     function forwardTo(chan) {
         if (chan.name !== name) {
@@ -133,6 +187,14 @@ function init() {
     }
 
 
+
+    //clears the topic
+    function unsubscribeAll(topic) {
+        if (subscriptions[topic]) {
+            subscriptions[topic] = [];
+        }
+    }
+
     function destroy() {
         subscriptions = {};
         transforms = {};
@@ -140,41 +202,38 @@ function init() {
         forwards = {};
     }
 
-    function mkDef(api) {
-        return function (definition) {
-            api.promises = q;
-            return definition(api);
-        }
-    }
 
     return {
+        name: name,
+        report: function (func) {
+            reporter = func;
+        },
         define: {
             publisher: mkDef({
                 publish: publish
             }),
             subscriber: mkDef({
-                subscribe: subscribe,
+                subscribe: flowElementRegistererFactory(subscriptions),
                 unsubscribeAll: unsubscribeAll
             }),
             transform: mkDef({
-                transform: transform
+                transform: flowElementRegistererFactory(transforms)
             }),
             moderator: mkDef({
-                moderator: moderator
+                moderator: controlHandlerRegistererFactory(moderators, "moderator")
             })
         },
         forwardTo: forwardTo,
         dropForward: dropForward,
-        name: name,
         destroy: destroy
     };
 
 }
 
-var globalSubscribtions = init();
+var globalSubscriptions = init();
 
 module.exports = {
     promises: q,
     newChannel: init,
-    global: globalSubscribtions
+    global: globalSubscriptions
 };
