@@ -18,9 +18,20 @@ function identity(i) {
     return i;
 }
 
-function getByTopic(collection, topic) {
+function topicRecur(collection, topic) {
     var parentTopic = topic.replace(/\.[^.]+$/, '');
-    return [].concat(collection[topic], (topic !== parentTopic ? getByTopic(collection, parentTopic) : [])).filter(identity);
+    return [].concat(
+        (topic !== parentTopic ? getByTopic(collection, parentTopic) : []),
+        collection[topic]
+    );
+}
+
+function getByTopic(collection, topic) {
+    topicRecur(collection, topic).filter(identity).sort(function (a, b) {
+        return ~~(a.order) - ~~(b.order) //ascending
+    }).map(function (e) {
+        return e.func
+    });
 }
 
 
@@ -34,12 +45,13 @@ function init() {
         forwards = {};
 
     //subscribes a function to a topic
-    function subscribe(topic, func) {
+    function subscribe(topic, func, order) {
         if (!subscriptions[topic]) {
             subscriptions[topic] = [];
         }
         subscriptions[topic].push({
-            func: func
+            func: func,
+            order: order
         });
     }
 
@@ -63,9 +75,9 @@ function init() {
             });
             return promiseArgs;
         }).then(function (data) {
-            if (moderator[topic]) {
+            if (moderators[topic]) {
                 return q().then(function () {
-                    return moderator[topic](data, topic);
+                    return moderators[topic](data, topic);
                 }).then(function (topicDetail) {
                     topic = topic + '.' + topicDetail;
                     return data;
@@ -75,11 +87,9 @@ function init() {
             }
         }).then(function (data) {
             var selectedSubs = getByTopic(subscriptions, topic);
-            var todos = [];
-            //call subscribers
-            todos = todos.concat(selectedSubs.map(function (subber) {
-                return subber.func(data);
-            }));
+            var todos = selectedSubs.map(function (subber) {
+                return subber(data);
+            });
             for (var ch in forwards) {
                 //TODO, this is kinda inconsequent, resolutions from there are going to be returned as arrays
                 //but at least error handling is ok.
@@ -92,11 +102,14 @@ function init() {
 
     //register a transform function that gets called the same way as a subscribtion handler, but has to resolve to arguments that are supposed to be passed on
     //if transform function throws, the publish is instantly cancelled
-    function transform(what, transform) {
+    function transform(what, transform, order) {
         if (!transforms[what]) {
             transforms[what] = [];
         }
-        transforms[what].push(transform);
+        transforms[what].push({
+            func: transform,
+            order: order
+        });
     }
 
     function moderator(what, moderator) {
