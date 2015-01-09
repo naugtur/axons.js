@@ -97,32 +97,32 @@ function init() {
     function publish(topic, input) {
         var report = ['pub:' + topic];
 
+        var data = (input) ? clone(input) : {};
+
         return q().then(function () {
             var selectedTransforms = getByTopic(transforms, topic).sort(function (a, b) {
                 return (~~(a.ord) - ~~(b.ord)) //ascending
             });
-            var data = (input) ? clone(input) : {};
             var promiseArgs = q(data);
             selectedTransforms.forEach(function (transform) {
-                promiseArgs = promiseArgs.then(function (data) {
+                promiseArgs = promiseArgs.then(function (intermediateData) {
+                    data = intermediateData;
                     reporter && report.push('tr:' + transform.t);
                     return transform.func(data);
                 });
             });
             return promiseArgs;
-        }).then(function (data) {
+        }).then(function (transformedData) {
+            data = transformedData;
             if (moderators[topic]) {
                 return q().then(function () {
                     return moderators[topic](data, topic);
                 }).then(function (topicDetail) {
                     reporter && report.push('mod:' + topic + '+.' + topicDetail);
                     topic = topic + '.' + topicDetail;
-                    return data;
                 })
-            } else {
-                return data;
             }
-        }).then(function (data) {
+        }).then(function () {
             var selectedSubs = getByTopic(subscriptions, topic);
             var currentRepot, todos;
             if (reporter) {
@@ -163,8 +163,11 @@ function init() {
             reporter && reporter({
                 report: '[!!] ' + report.join(" >> ") + " (!)" + err,
                 input: input,
+                data: data,
                 error: err
             });
+            err.data = data;
+            err.topic = topic;
             throw err;
         });
 

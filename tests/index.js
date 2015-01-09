@@ -18,6 +18,7 @@ axons.global.define.transform(function (tr) {
     }, -1)
     tr.transform('test.case', function (a) {
         console.log('inside transform 2: ', a);
+        a.baz=2;
         return a;
     })
     tr.transform('test', function (a) {
@@ -62,5 +63,6 @@ axons.global.define.publisher(function (pub) {
     }).fail(function (e) {
         console.error(e);
         console.error(e.stack);
+        console.log('data',e.data);
     });
 });
