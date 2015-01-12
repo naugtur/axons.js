@@ -18,7 +18,7 @@ axons.global.define.transform(function (tr) {
     }, -1)
     tr.transform('test.case', function (a) {
         console.log('inside transform 2: ', a);
-        a.baz=2;
+        a.baz = 2;
         return a;
     })
     tr.transform('test', function (a) {
@@ -45,6 +45,10 @@ axons.global.define.subscriber(function (sub) {
     sub.subscribe('test.case.moderated', function justSub(data) {
         console.log('inside subber 3: ', data);
         return sub.promises();
+    }); 
+    sub.subscribe('test.termination', function justSub(data) {
+        console.log('THIS SHOULD NOT HAPPEN');
+        return sub.promises();
     });
 
 });
@@ -53,6 +57,11 @@ axons.global.define.moderator(function (mod) {
     mod.moderator('test.case', function (data) {
         //appends to topic based on data
         return 'moderated';
+    });
+
+    mod.moderator('test.termination', function (data, Termination) {
+        //appends to topic based on data
+        return new Termination('reason!');
     });
 });
 
@@ -63,6 +72,12 @@ axons.global.define.publisher(function (pub) {
     }).fail(function (e) {
         console.error(e);
         console.error(e.stack);
-        console.log('data',e.data);
+        console.log('data', e.data);
+    });
+
+    pub.publish('test.termination', {}).fail(function (e) {
+        console.error(e);
+        console.error(e.stack);
+        console.log('data', e.data);
     });
 });

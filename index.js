@@ -83,6 +83,10 @@ function controlHandlerRegistererFactory(handlersCollection, name) {
 
 }
 
+function Termination(reason) {
+    this.reason = reason;
+}
+
 function init() {
 
     var name = channelSeed++,
@@ -116,13 +120,21 @@ function init() {
             data = transformedData;
             if (moderators[topic]) {
                 return q().then(function () {
-                    return moderators[topic](data, topic);
-                }).then(function (topicDetail) {
-                    reporter && report.push('mod:' + topic + '+.' + topicDetail);
-                    topic = topic + '.' + topicDetail;
+                    return moderators[topic](data, Termination);
+                }).then(function (moderationResult) {
+                    if (moderationResult instanceof Termination) {
+                        reporter && report.push('mod:' + topic + '=terminated');
+                    } else {
+                        reporter && report.push('mod:' + topic + '+.' + moderationResult);
+                        topic = topic + '.' + moderationResult;
+                    }
+                    return moderationResult;
                 })
             }
-        }).then(function () {
+        }).then(function (moderationResult) {
+            if (moderationResult instanceof Termination) {
+                return moderationResult;
+            }
             var selectedSubs = getByTopic(subscriptions, topic);
             var currentRepot, todos;
             if (reporter) {
