@@ -248,6 +248,7 @@ function init() {
 var globalSubscriptions = init();
 
 module.exports = {
+    Termination: Termination,
     promises: q,
     newChannel: init,
     global: globalSubscriptions
