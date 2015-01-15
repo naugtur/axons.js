@@ -83,6 +83,19 @@ function controlHandlerRegistererFactory(handlersCollection, name) {
 
 }
 
+//polyglot timestamp implementation
+function getTime() {
+    if (typeof window !== "undefined") {
+        if (window.performance) {
+            return performance.now()
+        } else {
+            return +new Date() //better than nothing
+        }
+    }else{
+        return (process.hrtime()[1])/1000000
+    }
+}
+
 function Termination(reason) {
     this.reason = reason;
 }
@@ -99,7 +112,10 @@ function init() {
 
     //publishes in topic
     function publish(topic, input) {
-        var report = ['pub:' + topic];
+        if (reporter) {
+            var report = ['pub:' + topic];
+            var reportT1 = getTime();
+        }
 
         var data = (input) ? clone(input) : {};
 
@@ -168,7 +184,7 @@ function init() {
 
         }).then(function (resolutions) {
             reporter && reporter({
-                report: '[ok] ' + report.join(" >> ")
+                report: '[ok] ' + report.join(" >> ") + " ["+(getTime()-reportT1).toFixed(3)+"ms]"
             });
             return resolutions;
         }, function (err) {
