@@ -116,6 +116,10 @@ Functionality of those matches `kriskoval/q`
 
 
 
+```javascript
+CHANNEL["~inspect"]() //returns all registered flow elements, for debugging purposes only
+```
+
 
 
 

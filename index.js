@@ -91,8 +91,8 @@ function getTime() {
         } else {
             return +new Date() //better than nothing
         }
-    }else{
-        return (process.hrtime()[1])/1000000
+    } else {
+        return (process.hrtime()[1]) / 1000000
     }
 }
 
@@ -184,7 +184,7 @@ function init() {
 
         }).then(function (resolutions) {
             reporter && reporter({
-                report: '[ok] ' + report.join(" >> ") + " ["+(getTime()-reportT1).toFixed(3)+"ms]"
+                report: '[ok] ' + report.join(" >> ") + " [" + (getTime() - reportT1).toFixed(3) + "ms]"
             });
             return resolutions;
         }, function (err) {
@@ -238,6 +238,15 @@ function init() {
         name: name,
         report: function (func) {
             reporter = func;
+        },
+        "~inspect": function () {
+            return {
+                subscriptions: subscriptions,
+                transforms: transforms,
+                moderators: moderators,
+                forwards: forwards,
+                reporter: reporter
+            }
         },
         define: {
             publisher: mkDef({
