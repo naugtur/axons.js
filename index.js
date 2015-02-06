@@ -127,7 +127,7 @@ function init() {
             selectedTransforms.forEach(function (transform) {
                 promiseArgs = promiseArgs.then(function (intermediateData) {
                     data = intermediateData;
-                    reporter && report.push('tr:' + transform.t);
+                    reporter && report.push('tr:' + transform.t +" @"+ transform.func.name);
                     return transform.func(data);
                 });
             });
@@ -158,10 +158,10 @@ function init() {
                 report[currentRepot] = 'subs: ';
                 todos = selectedSubs.map(function (subber) {
                     return q(data).then(subber.func).then(function (a) {
-                        report[currentRepot] += (subber.t + ';');
+                        report[currentRepot] += ("\n        "+subber.t +" @"+ subber.func.name + '');
                         return a;
                     }, function (err) {
-                        report[currentRepot] += (subber.t + '(!);');
+                        report[currentRepot] += ("\n        "+subber.t +" @"+ subber.func.name + '(!)');
                         throw err;
                     });
                 });
@@ -184,12 +184,12 @@ function init() {
 
         }).then(function (resolutions) {
             reporter && reporter({
-                report: '[ok] ' + report.join(" >> ") + " [" + (getTime() - reportT1).toFixed(3) + "ms]"
+                report: '[ok] [' + (getTime() - reportT1).toFixed(3) + 'ms] ' + report.join("\n    > ") 
             });
             return resolutions;
         }, function (err) {
             reporter && reporter({
-                report: '[!!] ' + report.join(" >> ") + " (!)" + err,
+                report: '[!!] ' + report.join("\n    > ") + " (!)" + err,
                 input: input,
                 data: data,
                 error: err
