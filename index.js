@@ -92,7 +92,8 @@ function getTime() {
             return +new Date() //better than nothing
         }
     } else {
-        return (process.hrtime()[1]) / 1000000
+        var t = process.hrtime();
+        return ((t[0]) * 1000) + (t[1] / 1000000);
     }
 }
 
@@ -127,7 +128,7 @@ function init() {
             selectedTransforms.forEach(function (transform) {
                 promiseArgs = promiseArgs.then(function (intermediateData) {
                     data = intermediateData;
-                    reporter && report.push('tr:' + transform.t +" @"+ transform.func.name);
+                    reporter && report.push('tr:' + transform.t + " @" + transform.func.name);
                     return transform.func(data);
                 });
             });
@@ -158,10 +159,10 @@ function init() {
                 report[currentRepot] = 'subs: ';
                 todos = selectedSubs.map(function (subber) {
                     return q(data).then(subber.func).then(function (a) {
-                        report[currentRepot] += ("\n        "+subber.t +" @"+ subber.func.name + '');
+                        report[currentRepot] += ("\n        " + subber.t + " @" + subber.func.name + '');
                         return a;
                     }, function (err) {
-                        report[currentRepot] += ("\n        "+subber.t +" @"+ subber.func.name + '(!)');
+                        report[currentRepot] += ("\n        " + subber.t + " @" + subber.func.name + '(!)');
                         throw err;
                     });
                 });
@@ -184,7 +185,8 @@ function init() {
 
         }).then(function (resolutions) {
             reporter && reporter({
-                report: '[ok] [' + (getTime() - reportT1).toFixed(3) + 'ms] ' + report.join("\n    > ") 
+                report: '[ok] [' + (getTime() - reportT1).toFixed(3) + 'ms] ' + report.join("\n    > "),
+                data: data
             });
             return resolutions;
         }, function (err) {
